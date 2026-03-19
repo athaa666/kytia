@@ -1,0 +1,86 @@
+/**
+ * @namespace: addons/ai/commands/ai/fact-delete.js
+ * @type: Command
+ * @copyright © 2026 kenndeclouv
+ * @assistant graa & chaa
+ * @version 1.0.0-rc
+ */
+
+const { MessageFlags } = require('discord.js');
+
+module.exports = {
+	subcommand: true,
+	slashCommand: (subcommand) =>
+		subcommand
+			.setName('fact-delete')
+			.setDescription('Delete a specific fact about you')
+			.addIntegerOption((option) =>
+				option
+					.setName('number')
+					.setDescription('Fact number from /ai facts (1, 2, 3...)')
+					.setRequired(true)
+					.setMinValue(1),
+			),
+
+	/**
+	 * @param {import('discord.js').ChatInputCommandInteraction} interaction
+	 * @param {KythiaDI.Container} container
+	 */
+	async execute(interaction, container) {
+		const { t, models, helpers } = container;
+		const { UserFact } = models;
+		const { simpleContainer } = helpers.discord;
+
+		await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+		const factNumber = interaction.options.getInteger('number');
+
+		const allFacts = await UserFact.getAllCache({
+			where: { userId: interaction.user.id },
+			order: [['createdAt', 'DESC']],
+			cacheTags: [`UserFact:byUser:${interaction.user.id}`],
+		});
+
+		if (allFacts.length === 0) {
+			const msg = await t(interaction, 'ai.ai.fact_delete.no_facts');
+			const components = await simpleContainer(interaction, msg, {
+				color: 'Red',
+			});
+			return interaction.editReply({
+				components,
+				flags: MessageFlags.IsComponentsV2,
+			});
+		}
+
+		if (factNumber > allFacts.length) {
+			const msg = await t(interaction, 'ai.ai.fact_delete.invalid_number', {
+				max: allFacts.length,
+			});
+			const components = await simpleContainer(interaction, msg, {
+				color: 'Red',
+			});
+			return interaction.editReply({
+				components,
+				flags: MessageFlags.IsComponentsV2,
+			});
+		}
+
+		const factToDelete = allFacts[factNumber - 1];
+
+		await factToDelete.destroy();
+
+		// await UserFact.invalidateCache([`UserFact:byUser:${interaction.user.id}`]);
+
+		const msg = await t(interaction, 'ai.ai.fact_delete.success', {
+			fact: factToDelete.fact,
+		});
+		const components = await simpleContainer(interaction, msg, {
+			color: 'Green',
+		});
+
+		return interaction.editReply({
+			components,
+			flags: MessageFlags.IsComponentsV2,
+		});
+	},
+};

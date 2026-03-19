@@ -1,0 +1,8 @@
+{
+	"name": "AI",
+	"featureName": "Ai",
+	"featureFlag": "aiOn",
+	"version": "1.0.0",
+	"description": "Harness the power of Google's Gemini AI to bring intelligent conversations to your server! Get smart responses, translations, creative writing assistance, and engaging AI interactions that make your Discord community more dynamic and helpful.",
+	"author": "kenndeclouv"
+}
