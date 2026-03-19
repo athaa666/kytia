@@ -1,0 +1,127 @@
+/**
+ * @namespace: addons/checklist/commands/server/remove.js
+ * @type: Command
+ * @copyright © 2026 kenndeclouv
+ * @assistant graa & chaa
+ * @version 1.0.0-rc
+ */
+
+const { getChecklistAndItems, getScopeMeta } = require('../../helpers');
+const { MessageFlags } = require('discord.js');
+
+module.exports = {
+	subcommand: true,
+	slashCommand: (subcommand) =>
+		subcommand
+			.setName('remove')
+			.setDescription('Remove item from server checklist')
+			.addIntegerOption((option) =>
+				option
+					.setName('index')
+					.setDescription('Item number to remove')
+					.setRequired(true),
+			),
+
+	/**
+	 * @param {import('discord.js').ChatInputCommandInteraction} interaction
+	 * @param {KythiaDI.Container} container
+	 */
+	async execute(interaction, container) {
+		const { t, helpers } = container;
+		const { simpleContainer } = helpers.discord;
+
+		const guildId = interaction.guild?.id;
+		const userId = null; // Server scope
+		const group = 'server';
+
+		const index = interaction.options.getInteger('index');
+		if (!index || typeof index !== 'number' || index < 1) {
+			await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+			const msg =
+				(await t(interaction, 'checklist.server.toggle.invalid.index.title')) +
+				'\n' +
+				(await t(interaction, 'checklist.server.toggle.invalid.index.desc'));
+			const components = await simpleContainer(interaction, msg, {
+				color: 'Red',
+			});
+			return interaction.editReply({
+				components,
+				flags: MessageFlags.IsComponentsV2,
+			});
+		}
+
+		const { checklist, items } = await getChecklistAndItems({
+			container,
+			guildId,
+			userId,
+		});
+		const { scopeKey, color, ephemeral } = getScopeMeta(
+			container,
+			userId,
+			group,
+		);
+
+		if (!checklist || !Array.isArray(items) || items.length === 0) {
+			await interaction.deferReply({ ephemeral });
+			const msg =
+				(await t(interaction, 'checklist.server.toggle.empty.title', {
+					scope: await t(interaction, scopeKey),
+				})) +
+				'\n' +
+				(await t(interaction, 'checklist.server.remove.remove.empty.desc'));
+			const components = await simpleContainer(interaction, msg, {
+				color: 'Red',
+			});
+			return interaction.editReply({
+				components,
+				flags: MessageFlags.IsComponentsV2,
+			});
+		}
+
+		if (index < 1 || index > items.length) {
+			await interaction.deferReply({ ephemeral });
+			const msg =
+				(await t(interaction, 'checklist.server.toggle.invalid.index.title')) +
+				'\n' +
+				(await t(interaction, 'checklist.server.toggle.invalid.index.desc'));
+			const components = await simpleContainer(interaction, msg, {
+				color: 'Red',
+			});
+			return interaction.editReply({
+				components,
+				flags: MessageFlags.IsComponentsV2,
+			});
+		}
+
+		const removed = items.splice(index - 1, 1);
+		try {
+			await checklist.update({ items: JSON.stringify(items) });
+		} catch (_e) {
+			await interaction.deferReply({ ephemeral });
+			const msg =
+				'Checklist Error\nFailed to update checklist. Please try again.';
+			const components = await simpleContainer(interaction, msg, {
+				color: 'Red',
+			});
+			return interaction.editReply({
+				components,
+				flags: MessageFlags.IsComponentsV2,
+			});
+		}
+
+		await interaction.deferReply({ ephemeral });
+		const msg =
+			(await t(interaction, 'checklist.server.remove.remove.success.title', {
+				scope: await t(interaction, scopeKey),
+			})) +
+			'\n' +
+			(await t(interaction, 'checklist.server.remove.remove.success.desc', {
+				item: removed[0]?.text || '-',
+			}));
+		const components = await simpleContainer(interaction, msg, { color });
+		return interaction.editReply({
+			components,
+			flags: MessageFlags.IsComponentsV2,
+		});
+	},
+};

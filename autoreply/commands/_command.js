@@ -1,0 +1,17 @@
+/**
+ * @namespace: addons/autoreply/commands/_command.js
+ * @type: Command Group Definition
+ * @copyright © 2026 kenndeclouv
+ * @assistant graa & chaa
+ * @version 1.0.0-rc
+ */
+
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+
+module.exports = {
+	guildOnly: true,
+	slashCommand: new SlashCommandBuilder()
+		.setName('autoreply')
+		.setDescription('🤖 Manage custom auto-replies for your server.')
+		.setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+};

@@ -1,0 +1,8 @@
+{
+	"name": "Checklist",
+	"featureName": "Checklist",
+	"featureFlag": "checklistOn",
+	"version": "1.0.0-rc1",
+	"description": "Stay organized and boost productivity with powerful checklist management! Create, share, and track tasks collaboratively. Perfect for project management, event planning, or keeping your community organized with interactive to-do lists.",
+	"author": "kenndeclouv"
+}
