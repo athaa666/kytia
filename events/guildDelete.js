@@ -1,0 +1,87 @@
+/**
+ * @namespace: addons/core/events/guildDelete.js
+ * @type: Event Handler
+ * @copyright © 2026 kenndeclouv
+ * @assistant graa & chaa
+ * @version 1.0.0-rc
+ */
+
+const {
+	MessageFlags,
+	ContainerBuilder,
+	TextDisplayBuilder,
+	SeparatorBuilder,
+	SeparatorSpacingSize,
+} = require('discord.js');
+const Sentry = require('@sentry/node');
+
+module.exports = async (bot, guild) => {
+	const container = bot.client.container;
+	const { t, kythiaConfig, helpers, logger } = container;
+	const { convertColor } = helpers.color;
+
+	const webhookUrl = kythiaConfig.api.webhookGuildInviteLeave;
+	if (webhookUrl) {
+		try {
+			const accentColor = convertColor('Red', {
+				from: 'discord',
+				to: 'decimal',
+			});
+
+			const leaveContainer = new ContainerBuilder()
+				.setAccentColor(accentColor)
+				.addTextDisplayComponents(
+					new TextDisplayBuilder().setContent(
+						await t(
+							guild,
+							'core.events.guildDelete.events.guild.delete.webhook.desc',
+							{
+								bot: guild.client.user.username,
+								guild: guild.name,
+								guildId: guild.id,
+								ownerId: guild.ownerId,
+								memberCount: guild.memberCount ?? '?',
+								createdAt: guild.createdAt.toLocaleDateString('en-US', {
+									year: 'numeric',
+									month: 'long',
+									day: 'numeric',
+								}),
+							},
+						),
+					),
+				)
+				.addSeparatorComponents(
+					new SeparatorBuilder()
+						.setSpacing(SeparatorSpacingSize.Small)
+						.setDivider(true),
+				)
+				.addTextDisplayComponents(
+					new TextDisplayBuilder().setContent(
+						`-# © ${bot.client.user.username} by kenndeclouv`,
+					),
+				);
+
+			const url = new URL(webhookUrl);
+			url.searchParams.append('wait', 'true');
+			url.searchParams.append('with_components', 'true');
+
+			const payload = {
+				flags: MessageFlags.IsComponentsV2,
+				components: [leaveContainer.toJSON()],
+			};
+
+			await fetch(url.href, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload),
+			});
+		} catch (err) {
+			logger.error(`Failed to send guild delete webhook: ${err.message}`, {
+				label: 'guildDelete:webhook',
+			});
+			if (bot.config?.sentry?.dsn) {
+				Sentry.captureException(err);
+			}
+		}
+	}
+};

@@ -1,0 +1,9 @@
+{
+	"name": "Core",
+	"priority": 1,
+	"featureName": "Core",
+	"featureFlag": "coreOn",
+	"version": "1.0.0",
+	"description": "The foundation that powers everything! Essential bot functionalities including moderation tools, server management, utilities, and core systems that keep your Discord server running smoothly and efficiently.",
+	"author": "kenndeclouv"
+}

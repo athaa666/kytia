@@ -1,0 +1,100 @@
+/**
+ * @namespace: addons/core/events/guildBanAdd.js
+ * @type: Event Handler
+ * @copyright © 2026 kenndeclouv
+ * @assistant graa & chaa
+ * @version 1.0.0-rc
+ */
+
+const {
+	AuditLogEvent,
+	MessageFlags,
+	ContainerBuilder,
+	SeparatorBuilder,
+	TextDisplayBuilder,
+	SeparatorSpacingSize,
+} = require('discord.js');
+const Sentry = require('@sentry/node');
+
+module.exports = async (bot, ban) => {
+	if (!ban.guild) return;
+	const container = bot.client.container;
+	const { models, helpers, logger, t } = container;
+	const { ServerSetting } = models;
+	const { convertColor } = helpers.color;
+	const guildId = ban.guild.id;
+
+	try {
+		const settings = await ServerSetting.getCache({ guildId });
+		if (!settings || !settings.auditLogChannelId) return;
+
+		const logChannel = await ban.guild.channels
+			.fetch(settings.auditLogChannelId)
+			.catch(() => null);
+		if (!logChannel || !logChannel.isTextBased()) return;
+
+		const audit = await ban.guild.fetchAuditLogs({
+			type: AuditLogEvent.MemberBanAdd,
+			limit: 1,
+		});
+
+		const entry = audit.entries.find(
+			(e) =>
+				e.target?.id === ban.user.id && e.createdTimestamp > Date.now() - 5000,
+		);
+
+		if (!entry) return;
+
+		const executor = entry.executor;
+		const components = [
+			new ContainerBuilder()
+				.setAccentColor(convertColor('Red', { from: 'discord', to: 'decimal' }))
+				.addTextDisplayComponents(
+					new TextDisplayBuilder().setContent(
+						`🔨 **Member Banned** by <@${executor?.id || 'Unknown'}>\n\n` +
+							`**User:** ${ban.user.tag} (<@${ban.user.id}>)\n` +
+							`**User ID:** ${ban.user.id}\n` +
+							`**Account Created:** <t:${Math.floor(ban.user.createdTimestamp / 1000)}:F>\n` +
+							`**Ban Reason:** ${ban.reason || 'No reason provided'}` +
+							(entry.reason ? `\n**Audit Reason:** ${entry.reason}` : ''),
+					),
+				)
+				.addSeparatorComponents(
+					new SeparatorBuilder()
+						.setSpacing(SeparatorSpacingSize.Small)
+						.setDivider(true),
+				)
+				.addTextDisplayComponents(
+					new TextDisplayBuilder().setContent(
+						`👤 **Executor:** ${executor?.tag || 'Unknown'} (${executor?.id || 'Unknown'})\n` +
+							`🕒 **Timestamp:** <t:${Math.floor(Date.now() / 1000)}:F>`,
+					),
+				)
+				.addSeparatorComponents(
+					new SeparatorBuilder()
+						.setSpacing(SeparatorSpacingSize.Small)
+						.setDivider(true),
+				)
+				.addTextDisplayComponents(
+					new TextDisplayBuilder().setContent(
+						await t({ guildId }, 'common.container.footer', {
+							username: bot.client.user.username,
+						}),
+					),
+				),
+		];
+
+		await logChannel.send({
+			components,
+			flags: MessageFlags.IsComponentsV2,
+			allowedMentions: {
+				parse: [],
+			},
+		});
+	} catch (err) {
+		logger.error(err, { label: 'guildBanAdd' });
+		if (bot.config?.sentry?.dsn) {
+			Sentry.captureException(err);
+		}
+	}
+};

@@ -1,0 +1,16 @@
+/**
+ * @namespace: addons/core/database/models/StickyMessage.js
+ * @type: Database Model
+ * @copyright © 2026 kenndeclouv
+ * @assistant graa & chaa
+ * @version 1.0.0-rc
+ */
+
+const { KythiaModel } = require('kythia-core');
+
+class StickyMessage extends KythiaModel {
+	static cacheKeys = [['channelId']];
+	static guarded = [];
+}
+
+module.exports = StickyMessage;

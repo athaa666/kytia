@@ -1,0 +1,114 @@
+/**
+ * @namespace: addons/core/events/stageInstanceUpdate.js
+ * @type: Event Handler
+ * @copyright © 2026 kenndeclouv
+ * @assistant graa & chaa
+ * @version 1.0.0-rc
+ */
+
+const {
+	AuditLogEvent,
+	MessageFlags,
+	ContainerBuilder,
+	SeparatorBuilder,
+	TextDisplayBuilder,
+	SeparatorSpacingSize,
+} = require('discord.js');
+const Sentry = require('@sentry/node');
+
+module.exports = async (bot, oldStage, newStage) => {
+	if (!newStage.guild) return;
+	const container = bot.client.container;
+	const { models, helpers, logger, t } = container;
+	const { ServerSetting } = models;
+	const { convertColor } = helpers.color;
+	const guildId = newStage.guild.id;
+
+	try {
+		const settings = await ServerSetting.getCache({
+			guildId: newStage.guild.id,
+		});
+		if (!settings || !settings.auditLogChannelId) return;
+
+		const logChannel = await newStage.guild.channels
+			.fetch(settings.auditLogChannelId)
+			.catch(() => null);
+		if (!logChannel || !logChannel.isTextBased()) return;
+
+		const audit = await newStage.guild.fetchAuditLogs({
+			type: AuditLogEvent.StageInstanceUpdate,
+			limit: 1,
+		});
+
+		const entry = audit.entries.find(
+			(e) =>
+				e.target?.id === newStage.id && e.createdTimestamp > Date.now() - 5000,
+		);
+
+		if (!entry) return;
+
+		const changes = [];
+		if (oldStage.topic !== newStage.topic) {
+			changes.push(`**Topic**: \`${oldStage.topic}\` ➔ \`${newStage.topic}\``);
+		}
+		if (oldStage.privacyLevel !== newStage.privacyLevel) {
+			const oldPrivacy = oldStage.privacyLevel === 1 ? 'Public' : 'Guild Only';
+			const newPrivacy = newStage.privacyLevel === 1 ? 'Public' : 'Guild Only';
+			changes.push(`**Privacy**: \`${oldPrivacy}\` ➔ \`${newPrivacy}\``);
+		}
+
+		if (changes.length === 0) return;
+
+		const executor = entry.executor;
+		const components = [
+			new ContainerBuilder()
+				.setAccentColor(
+					convertColor('Blurple', { from: 'discord', to: 'decimal' }),
+				)
+				.addTextDisplayComponents(
+					new TextDisplayBuilder().setContent(
+						`🎤 **Stage Updated** by <@${executor?.id || 'Unknown'}>\n\n` +
+							`**Channel:** <#${newStage.channelId}>\n\n` +
+							`**Changes:**\n${changes.join('\n')}` +
+							(entry.reason ? `\n\n**Reason:** ${entry.reason}` : ''),
+					),
+				)
+				.addSeparatorComponents(
+					new SeparatorBuilder()
+						.setSpacing(SeparatorSpacingSize.Small)
+						.setDivider(true),
+				)
+				.addTextDisplayComponents(
+					new TextDisplayBuilder().setContent(
+						`👤 **Executor:** ${executor?.tag || 'Unknown'} (${executor?.id || 'Unknown'})\n` +
+							`🕒 **Timestamp:** <t:${Math.floor(Date.now() / 1000)}:F>`,
+					),
+				)
+				.addSeparatorComponents(
+					new SeparatorBuilder()
+						.setSpacing(SeparatorSpacingSize.Small)
+						.setDivider(true),
+				)
+				.addTextDisplayComponents(
+					new TextDisplayBuilder().setContent(
+						await t({ guildId }, 'common.container.footer', {
+							username: bot.client.user.username,
+						}),
+					),
+				),
+		];
+
+		await logChannel.send({
+			components,
+			flags: MessageFlags.IsComponentsV2,
+			allowedMentions: {
+				parse: [],
+			},
+		});
+	} catch (err) {
+		logger.error(err, { label: 'stageInstanceUpdate' });
+		if (bot.config?.sentry?.dsn) {
+			Sentry.captureException(err);
+		}
+	}
+};
