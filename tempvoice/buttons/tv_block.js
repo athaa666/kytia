@@ -1,0 +1,60 @@
+/**
+ * @namespace: addons/tempvoice/buttons/tv_block.js
+ * @type: Module
+ * @copyright © 2026 kenndeclouv
+ * @assistant graa & chaa
+ * @version 1.0.0-rc
+ */
+const {
+	ActionRowBuilder,
+	UserSelectMenuBuilder,
+	ContainerBuilder,
+	TextDisplayBuilder,
+	MessageFlags,
+} = require('discord.js');
+
+module.exports = {
+	execute: async (interaction, container) => {
+		const { models, t, helpers, kythiaConfig } = container;
+		const { convertColor } = helpers.color;
+		const { TempVoiceChannel } = models;
+
+		const activeChannel = await TempVoiceChannel.getCache({
+			ownerId: interaction.user.id,
+			guildId: interaction.guild.id,
+		});
+
+		if (!activeChannel) {
+			return interaction.reply({
+				content: await t(interaction, 'tempvoice.block.no_active_channel'),
+				flags: MessageFlags.Ephemeral,
+			});
+		}
+
+		const selectMenu = new UserSelectMenuBuilder()
+			.setCustomId(`tv_block_menu:${activeChannel.channelId}`)
+			.setPlaceholder(await t(interaction, 'tempvoice.block.menu.placeholder'))
+			.setMinValues(1)
+			.setMaxValues(10);
+
+		const row = new ActionRowBuilder().addComponents(selectMenu);
+		const accentColor = convertColor(kythiaConfig.bot.color, {
+			from: 'hex',
+			to: 'decimal',
+		});
+
+		const containerComponent = new ContainerBuilder()
+			.setAccentColor(accentColor)
+			.addTextDisplayComponents(
+				new TextDisplayBuilder().setContent(
+					await t(interaction, 'tempvoice.block.menu.content'),
+				),
+			)
+			.addActionRowComponents(row);
+
+		await interaction.reply({
+			components: [containerComponent],
+			flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+		});
+	},
+};

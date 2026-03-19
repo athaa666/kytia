@@ -1,0 +1,121 @@
+/**
+ * @namespace: addons/tempvoice/buttons/tv_privacy.js
+ * @type: Module
+ * @copyright © 2026 kenndeclouv
+ * @assistant graa & chaa
+ * @version 1.0.0-rc
+ */
+const {
+	ActionRowBuilder,
+	StringSelectMenuBuilder,
+	ContainerBuilder,
+	TextDisplayBuilder,
+	MessageFlags,
+} = require('discord.js');
+
+module.exports = {
+	execute: async (interaction, container) => {
+		const { client, models, t, helpers, logger } = container;
+		const { TempVoiceChannel } = models;
+		const { convertColor } = helpers.color;
+		const { simpleContainer } = helpers.discord;
+
+		const activeChannel = await TempVoiceChannel.getCache({
+			ownerId: interaction.user.id,
+			guildId: interaction.guild.id,
+		});
+		if (!activeChannel) {
+			return interaction.reply({
+				content: await t(interaction, 'tempvoice.privacy.no_active_channel'),
+				flags: MessageFlags.Ephemeral,
+			});
+		}
+		const channelId = activeChannel.channelId;
+		let channel;
+		try {
+			channel = await client.channels.fetch(channelId, { force: true });
+		} catch (error) {
+			logger.error(
+				`[TempVoice] CRITICAL: Failed to fetch channel ${channelId} for rename. Error:`,
+				error,
+			);
+
+			return interaction.reply({
+				components: await simpleContainer(
+					interaction,
+					await t(interaction, 'tempvoice.common.channel_not_found'),
+					{ color: 'Red' },
+				),
+				flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
+			});
+		}
+
+		if (!channel) {
+			return interaction.reply({
+				content: await t(interaction, 'tempvoice.privacy.channel_not_found'),
+				flags: MessageFlags.Ephemeral,
+			});
+		}
+
+		const menu = new StringSelectMenuBuilder()
+			.setCustomId(`tv_privacy_menu:${channelId}`)
+			.setPlaceholder(
+				await t(interaction, 'tempvoice.privacy.menu.placeholder'),
+			)
+			.addOptions([
+				{
+					label: await t(interaction, 'tempvoice.privacy.menu.lock.label'),
+					description: await t(interaction, 'tempvoice.privacy.menu.lock.desc'),
+					value: 'lock_channel',
+					emoji: '🔒',
+				},
+				{
+					label: await t(interaction, 'tempvoice.privacy.menu.unlock.label'),
+					description: await t(
+						interaction,
+						'tempvoice.privacy.menu.unlock.desc',
+					),
+					value: 'unlock_channel',
+					emoji: '🔓',
+				},
+				{
+					label: await t(interaction, 'tempvoice.privacy.menu.invisible.label'),
+					description: await t(
+						interaction,
+						'tempvoice.privacy.menu.invisible.desc',
+					),
+					value: 'invisible_channel',
+					emoji: '❌',
+				},
+				{
+					label: await t(interaction, 'tempvoice.privacy.menu.visible.label'),
+					description: await t(
+						interaction,
+						'tempvoice.privacy.menu.visible.desc',
+					),
+					value: 'visible_channel',
+					emoji: '👁️',
+				},
+			]);
+
+		const row = new ActionRowBuilder().addComponents(menu);
+
+		const containerComponent = new ContainerBuilder()
+			.setAccentColor(
+				typeof convertColor === 'function'
+					? convertColor('#ffb86c', { from: 'hex', to: 'decimal' })
+					: 0xffb86c,
+			)
+			.addTextDisplayComponents(
+				new TextDisplayBuilder().setContent(
+					await t(interaction, 'tempvoice.privacy.menu.content'),
+				),
+			)
+			.addActionRowComponents(row);
+
+		await interaction.reply({
+			components: [containerComponent],
+			flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+		});
+	},
+};
